@@ -1,9 +1,10 @@
 from airflow import DAG
 from airflow.providers.standard.operators.bash import BashOperator
+from airflow.models import Variable
 from datetime import datetime
 import os
 
-PROJECT_ROOT = os.getenv("PROJECT_ROOT")
+PROJECT_ROOT = Variable.get("PROJECT_ROOT")
 PYTHON = os.getenv("PYTHON_PATH", "python")
 
 default_args = {
