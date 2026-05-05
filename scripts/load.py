@@ -30,10 +30,21 @@ latest_file = max(files, key=os.path.getctime)
 
 print("Loading:", latest_file)
 
+
+def safe_float(value):
+    try:
+        if value is None or value == "" or str(value).lower() == "none":
+            return None
+        return float(value)
+    except:
+        return None
+
+
 with open(latest_file, "r", encoding="utf-8") as f:
     reader = csv.DictReader(f)
 
     for row in reader:
+
         cur.execute("""
             INSERT INTO traffic_flow (
                 road,
@@ -42,17 +53,38 @@ with open(latest_file, "r", encoding="utf-8") as f:
                 jam_factor,
                 congestion_index,
                 confidence,
+
+                start_lat,
+                start_lng,
+                end_lat,
+                end_lng,
+                segment_length,
+
                 measurement_time
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (road, measurement_time) DO NOTHING
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (
+                road,
+                start_lat,
+                start_lng,
+                end_lat,
+                end_lng,
+                measurement_time
+            ) DO NOTHING
         """, (
             row["road"],
-            float(row["speed"]),
-            float(row["free_flow"]),
-            float(row["jam_factor"]),
-            float(row["congestion_index"]),
-            float(row["confidence"]),
+            safe_float(row["speed"]),
+            safe_float(row["free_flow"]),
+            safe_float(row["jam_factor"]),
+            safe_float(row["congestion_index"]),
+            safe_float(row["confidence"]),
+
+            safe_float(row["start_lat"]),
+            safe_float(row["start_lng"]),
+            safe_float(row["end_lat"]),
+            safe_float(row["end_lng"]),
+            safe_float(row["segment_length"]),
+
             row["measurement_time"]
         ))
 

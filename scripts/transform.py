@@ -2,10 +2,13 @@ import json
 import os
 import csv
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
+import zoneinfo
 
 PROJECT_ROOT = sys.argv[1]
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+
 
 def get_latest_file():
     files = os.listdir(DATA_DIR)
@@ -22,9 +25,11 @@ def transform(data):
     rows = []
 
     for item in data.get("results", []):
-        location = item.get("location", {}).get("description", "unknown")
 
-        if not location or location.lower() == "unknown":
+        location_obj = item.get("location", {})
+        description = location_obj.get("description")
+
+        if not description:
             continue
 
         flow = item.get("currentFlow", {})
@@ -37,15 +42,41 @@ def transform(data):
         if speed is None or free_flow is None:
             continue
 
-        rows.append({
-            "road": location,
-            "speed": speed,
-            "free_flow": free_flow,
-            "jam_factor": jam_factor,
-            "congestion_index": jam_factor,
-            "confidence": confidence,
-            "measurement_time": datetime.now(timezone.utc)
-        })
+        shape = location_obj.get("shape", {})
+        links = shape.get("links", [])
+
+        if not links:
+            continue
+
+        for link in links:
+
+            points = link.get("points", [])
+            if len(points) < 2:
+                continue
+
+            start = points[0]
+            end = points[-1]
+
+            rows.append({
+                "road": description,
+
+                "speed": speed,
+                "free_flow": free_flow,
+                "jam_factor": jam_factor,
+                "congestion_index": jam_factor,
+                "confidence": confidence,
+
+                "start_lat": start.get("lat"),
+                "start_lng": start.get("lng"),
+                "end_lat": end.get("lat"),
+                "end_lng": end.get("lng"),
+
+                "segment_length": link.get("length"),
+
+                "measurement_time": datetime.now(
+                    zoneinfo.ZoneInfo("Europe/Budapest")
+                )
+            })
 
     return rows
 
@@ -62,9 +93,10 @@ if not rows:
     print("No valid rows, skipping.")
     exit()
 
-os.makedirs(DATA_DIR, exist_ok=True)
+timestamp = datetime.now(
+    zoneinfo.ZoneInfo("Europe/Budapest")
+).strftime("%Y%m%d_%H%M%S")
 
-timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
 output_file = os.path.join(DATA_DIR, f"processed_{timestamp}.csv")
 
 with open(output_file, "w", newline="", encoding="utf-8") as f:
